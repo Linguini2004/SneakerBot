@@ -36,10 +36,14 @@ class SneakerList(scrapy.Spider):
             name_list[i] = name_list[i].replace("/", "")
             name_list[i] = name_list[i].replace("-", " ")
 
+        print(len(name_list))
         if sneaker_counter == 25:
             filename = "sneakers"
             with open(filename, 'w') as f:
-                f.write(str(name_list))
+                print("hello")
+                for i in name_list:
+
+                    f.write(i + "\n")
 
 
 

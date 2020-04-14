@@ -1,15 +1,19 @@
 import scrapy
+import pickle
+import json
 
-snkr_list = open("sneakers", "r")
-names = snkr_list.read()
-names = names.strip('][').split(', ')
-print(names)
+with open("sneakers") as f:
+  names = [line.strip() for line in f]
 root = "https://stockx.com/"
-shoe_counter = []
+start_point = int(input("What round, Davide? "))
+amount = int(input("How many shoes this time round? "))
+shoe_counter = 0
 stockx_data = []
 
 def url_formation(search):
+    global start_point
     global names
+    global shoe_names
     shoe_names = []
     for s in search:
         search_list = s.split()
@@ -20,13 +24,18 @@ def url_formation(search):
                 url_part2 += "-"
         firsts = root + url_part2
         shoe_names.append(firsts)
-        return shoe_names
+    floor_num = (start_point - 1) * amount
+    roof_num = start_point * amount
+    for i in range(floor_num):
+        shoe_names.pop(0)
+    for i in range(len(names) - roof_num):
+        shoe_names.pop(amount)
+    return shoe_names
 
 def dictionary_creation(price, size, url, name):
     # SIZES
     stockx_dict = {}
     size.pop(0)
-    print(size)
     size.remove("us All")
     previous = ""
     current = ""
@@ -35,7 +44,7 @@ def dictionary_creation(price, size, url, name):
     for i in range(len(size)):
         if delete == False:
             current = size[i].split()
-        if i > 0:
+        if i > 0 and "W" not in current[1] and "W" not in previous and "Y" not in current[1] and "Y" not in previous:
             if float(current[1]) < float(previous):
                 delete = True
                 to_delete = i
@@ -44,7 +53,6 @@ def dictionary_creation(price, size, url, name):
         previous = current[1]
     for i in range(len(size)):
         size[i] = size[i].upper()
-    print(size)
     #PRICES
     price.pop(0)
     while len(price) != len(size):
@@ -52,6 +60,8 @@ def dictionary_creation(price, size, url, name):
     mprice = []
     for i in price:
         if i != "Bid":
+            i = i.replace(",", "")
+            i = i.replace("K", "000")
             length = (len(i) - 1) * -1
             mprice.append([i[0], float(i[length:])])
         else:
@@ -59,7 +69,6 @@ def dictionary_creation(price, size, url, name):
 
     size_price = {}
     sp_list = []
-    print(len(size))
     for n, i in enumerate(size):
         size_price[i] = mprice[n]
 
@@ -73,17 +82,26 @@ class StockxSpider(scrapy.Spider):
     start_urls = url_formation(names)
 
     def parse(self, response):
+        global shoe_names
         global shoe_counter
         global stockx_data
         shoe_counter += 1
+        print(shoe_counter)
         sizes = response.css("div.title::text").getall()
         prices = response.css("div.subtitle::text").getall()
 
-        stockx_data.append(dictionary_creation(prices, sizes, response.request.url, query))
-        if shoe_counter == len(names):
+        stockx_data.append(dictionary_creation(prices, sizes, response.request.url, names[shoe_counter - 1]))
+        if shoe_counter == len(shoe_names):
             filename = "stockx1"
-            with open(filename, 'w') as f:
-                f.write(str(stockx_data))
+            if start_point == 1:
+                mode = "wb"
+            else:
+                mode = "ab"
+            with open(filename, mode) as f:
+                for shoe in stockx_data:
+                    f.write(json.dumps(shoe).encode("utf-8") + b"\n")
+                    mode = "ab"
+            f.close()
 
 # text = response.css("span.fvDOul::text").getall()
 # scrapy shell "https://www.depop.com/products/oxclothing-air-jordan-1-mid-chicago/"
